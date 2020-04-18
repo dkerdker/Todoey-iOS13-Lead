@@ -13,4 +13,6 @@ struct C {
     static let titleFont = "Verdana"
     static let todoListArray = "TodoListArray"
     static let toDoItemCell = "ToDoItemCell"
+    static let categoryCell = "CategoryCell"
+    static let itemSegue = "goToItems"
 }
