@@ -7,48 +7,60 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
+import ChameleonFramework
 
 //MARK: - CategoryViewController
 
-class CategoryViewController: UITableViewController {
+class CategoryViewController: SwipeTableViewController {
     
-    var categoryArray = [Category]()
+    let realm = try! Realm()
     
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-    
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    var categories: Results<Category>?
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        print(dataFilePath)
+        tableView.rowHeight = 70.0
+        tableView.separatorStyle = .none
         
-        navigationController?.navigationBar.barTintColor = UIColor(red: 0, green: 0.6902, blue: 0.9882, alpha: 1.0)
+        self.tableView.backgroundColor = UIColor(hexString: "1D9BF6")
+        
+        loadCategories()
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        navigationController?.navigationBar.backgroundColor = UIColor(hexString: "1D9BF6") //cyan
+        
         title = "Todoey"
-        navigationController?.navigationBar.titleTextAttributes = [
-            NSAttributedString.Key.foregroundColor: UIColor.white,
-            NSAttributedString.Key.font: UIFont(name: C.titleFont, size: 25)!
-        ]
+        
         navigationItem.hidesBackButton = true
         
-        loadItems()
+        navigationController?.navigationBar.setGradientBackground(colors: [UIColor(hexString: "1D9BF6")!, UIColor(hexString: "1D9BF6")!], startPoint: .topLeft, endPoint: .bottomRight)
+        
+        tableView.reloadData()
     }
     
     //MARK: - TableView Datasource Methods
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-            return categoryArray.count
-        }
+        
+        return categories?.count ?? 1
+    }
 
-        override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-
-            let cell = tableView.dequeueReusableCell(withIdentifier: C.categoryCell, for: indexPath)
-
-            let category = categoryArray[indexPath.row]
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
+        
+        if let category = categories?[indexPath.row] {
             cell.textLabel?.text = category.name
-
-            return cell
+            cell.backgroundColor = UIColor(hexString: category.colour)
+            cell.textLabel?.textColor = ContrastColorOf(UIColor(hexString: category.colour)!, returnFlat: true)
         }
+        
+        return cell
+    }
     
     //MARK: - Add New Categories
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
@@ -57,20 +69,22 @@ class CategoryViewController: UITableViewController {
         
         let alert = UIAlertController(title: "Add New Category", message: "", preferredStyle: .alert)
         
-        let actionAdd = UIAlertAction(title: "Add Category", style: .default) { (action) in
+        let actionAdd = UIAlertAction(title: "Add", style: .default) { (action) in
             //what will happen once the user clicks the Add Item button on the UIAlert
             
-            let newCat = Category(context: self.context)
+            let newCat = Category()
             newCat.name = textField.text!
+            newCat.colour = UIColor(randomFlatColorOf: .dark).hexValue()
             
-            if textField.text != "" {
-                self.categoryArray.append(newCat)
-            } else {
-                newCat.name = "New Category"
-                self.categoryArray.append(newCat)
-            }
+//            if textField.text != "" {
+//                self.categoryArray.append(newCat)
+//            } else {
+//                newCat.name = "New Category"
+//                self.categoryArray.append(newCat)
+//            }
 
-            self.saveItems()
+            self.save(category: newCat)
+            
         }
         
         alert.addTextField { (alertTextField) in
@@ -87,31 +101,46 @@ class CategoryViewController: UITableViewController {
     }
     
     //MARK: - Data Manipulation Methods
-    func saveItems() {
+    func save(category: Category) {
         
         do {
-            try self.context.save()
+            try realm.write {
+                realm.add(category)
+            }
         } catch {
             print("Error saving Category to context \(error)")
         }
 
-        self.tableView.reloadData()
+        tableView.reloadData()
     }
     
-    func loadItems(with request: NSFetchRequest<Category> = Category.fetchRequest()) {  //functions with DEFAULT VALUE
-        do {
-            categoryArray = try context.fetch(request)
-        } catch {
-            print("Error fetching Category data from context \(error)")
-        }
+    func loadCategories() {
+   
+        categories = realm.objects(Category.self)
         
-        self.tableView.reloadData()
+        tableView.reloadData()
+    }
+    
+    //MARK: - Delete Data From Swipe
+    
+    override func updateModel(at indexPath: IndexPath) {
+        if let categoryForDeletion = self.categories?[indexPath.row] {
+            do {
+                try self.realm.write {
+                    self.realm.delete(categoryForDeletion)
+                }
+            } catch {
+                print("Error deleting category, \(error)")
+            }
+        }
     }
     
     //MARK: - TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-            
-        performSegue(withIdentifier: C.itemSegue, sender: self)
+        
+        if let _ = categories {
+            performSegue(withIdentifier: C.itemSegue, sender: self)
+        }
             
         tableView.deselectRow(at: indexPath, animated: true)
     }
@@ -119,9 +148,9 @@ class CategoryViewController: UITableViewController {
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.identifier == C.itemSegue {
             let destinationVC = segue.destination as! TodoListViewController
-                        
+            
             if let indexPath = tableView.indexPathForSelectedRow {
-                destinationVC.selectedCategory = categoryArray[indexPath.row]
+                destinationVC.selectedCategory = categories?[indexPath.row]
             }
         }
     }
