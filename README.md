@@ -1,5 +1,5 @@
 # Todoey-iOS13-Lead
-A todo app utilizing Realm database framework.
+A todo app utilizing Realm database framework. <br>
 Feature: Shake to change theme colour.
 
 <p float="left">
